@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+  <meta http-equiv="Content-Language" content="en">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Demo page for Cumul8">
+  <meta name="author" content="Joe Lynch">
+
+  <title>Timesheet Demo</title>
+
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/formValidation.min.css">
+  <link rel="stylesheet" href="css/github.css">
+
+  <script src="js/jquery.min.js"></script>
+  <script src="js/bootstrap.min.js"></script>
+  <script src="js/formValidation.min.js"></script>
+  <script src="js/formValidationBootstrap.min.js"></script>
+
+  <style type="text/css">
+/*
+  Used to display a loading animation over the page.
+*/
+.modal {
+  display:    none;
+  position:   fixed;
+  z-index:    1000;
+  top:        0;
+  left:       0;
+  height:     100%;
+  width:      100%;
+  background: rgba( 255, 255, 255, .8 ) 
+  url('images/loading.gif') 
+  50% 50% 
+  no-repeat;
+}
+body.loading {
+  overflow: hidden;   
+}
+
+body.loading .modal {
+  display: block;
+}
+
+.align-across {
+  display: flex; justify-content: space-between;
+}
+
+.top-buffer {
+  margin-top:5px;
+}
+  </style>
+</head>
+
+<body>
+
+  <div class="container jumbotron">
+    <h2 class="text-center">Submit Timesheet</h2>
+    <form id="timesheetForm" method="get" action="success.html">
+
+      <div class="row">
+        <div class="form-group">
+          <div class="col-xs-12">
+            <input type="text" class="form-control" name="email" placeholder="Email" />
+          </div>
+        </div>
+      </div>
+
+      <div class="row top-buffer">
+        <div class="form-group">
+          <div class="col-xs-12">
+            <input id="duration" type="text" class="form-control" name="duration" placeholder="Duration (eg. 11h 11m)" />
+          </div>
+        </div>
+      </div>
+
+      <div class="row top-buffer">
+        <div class="form-group">
+          <div class="col-xs-12">
+            <textarea class="form-control" name="message" placeholder="Message (optional)"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="row top-buffer">
+        <label class="col-xs-12"> What type of work is this for? </label>
+      </div>
+
+      <div class="row">
+        <div class="form-group">
+          <div class=" btn-group-vertical col-xs-12" data-toggle="buttons">
+            <label class="btn btn-default">
+              <input type="radio" name="work_type" value="visual_effects" /> Time working on visual effects for movie
+            </label>
+            <label class="btn btn-default">
+              <input type="radio" name="work_type" value="visual_effects" /> Time spent reviewing the work of a junior artist
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="row top-buffer">
+        <div class="align-across col-xs-12">
+          <button id="clear" type="reset" class="btn btn-primary btn-lg">Clear</button>
+          <button type="submit" class="btn btn-primary btn-lg">Next</button>
+        </div>
+      </div>
+    </form>
+
+  </div>
+
+  <script>
+    // Reset the form.
+    $("#clear").click(function() {
+      $('#timesheetForm').data('formValidation').resetForm();
+      // Clear the button group which is being treated as a radio.
+      $('.btn-group-vertical label').removeClass('active');
+    });
+    
+    // Validate the form.
+    $(document).ready(function() {
+      $('#timesheetForm').formValidation({
+        framework: 'bootstrap',
+        icon: {
+          valid: 'glyphicon glyphicon-ok',
+          invalid: 'glyphicon glyphicon-remove',
+          validating: 'glyphicon glyphicon-refresh'
+        },
+        fields: {
+          email: {
+            validators: {
+              notEmpty: {
+                message: 'An email is required'
+              },
+              emailAddress: {
+                message: 'Not a valid email address'
+              }
+            }
+          },
+          duration: {
+            validators: {
+              notEmpty: {
+                message: 'A duration is required'
+              },
+              totalDuration: {
+                message: 'Invalid duration'
+              }
+            }
+          },
+          work_type: {
+            validators: {
+              notEmpty: {
+                message: 'A work type is required'
+              }
+            }
+          }
+        }
+      })
+      .on('success.form.fv', function(e) {
+        // Display the loading modal, then submit the form.
+
+        e.preventDefault();
+        var fv = $(e.target).data('formValidation');
+
+        $("body").addClass("loading");
+
+        setTimeout(function(){ 
+          // Massage the duration's value before submitting.
+          var minutes = toDurationString(parseDuration($("#duration").val()));
+          $("#duration").val(minutes);
+          fv.defaultSubmit();
+
+          // Should the submit fail, remove the loading modal.
+          setTimeout(function(){
+            $("body").removeClass("loading");
+            console.log("Failed to submit form.");
+          }, 5000);
+        }, 1000);
+      });
+    });
+
+    // Custom validator for the duration input.
+    (function($) {
+      FormValidation.Validator.totalDuration = {
+          // Takes template custom validator parameters.
+          // Returns true if it passes validation, false if it fails.
+          validate: function(validator, $field, options) {
+            var value = $field.val();
+            var minutes = parseDuration(value);
+            if (typeof minutes != 'number' || minutes <= 0) {
+              return false;
+            }
+            return true;
+        }
+      };
+    }(window.jQuery));
+
+    // Takes a duration in "11h 11m" format.
+    // Returns the duration converted to minutes.
+    function parseDuration(duration) {
+      if (duration == null || duration === '') {
+        return false;
+      }
+      
+      minuteRegex = new RegExp(/([0-9][0-9]?[0-9]?[0-9]?)[ ]?m/);
+      hourRegex = new RegExp(/([0-9][0-9]?[0-9]?[0-9]?)[ ]?h/);
+
+      minutes = 0;
+      hours = 0;
+
+      if (minuteRegex.test(duration)) {
+        minutes = minuteRegex.exec(duration)[1];
+      }
+      if (hourRegex.test(duration)) {
+        hours = hourRegex.exec(duration)[1];
+      }
+
+      return toMinutes(hours, minutes);
+    }
+
+    // Takes in hours and minutes.
+    // Returns the two values added together, in minutes.
+    function toMinutes(hh,mm) {
+      h = parseInt(hh);
+      m = parseInt(mm);
+      if (isNaN(h)) h = 0;
+      if (isNaN(m)) m = 0;
+
+      return h * 60 + m;
+    }
+
+    // Takes in a duration in minutes.
+    // Outputs a duration string based on the number of minutes provided.
+    function toDurationString(duration) {
+      if (duration <= 0) {
+        return '';
+      }
+      var h = Math.floor(duration/60);
+      var m = duration - h * 60;
+      result = '';
+      if (h > 0) {
+        result  = result + h + 'h ';
+      }
+      if (m > 0) {
+        result  = result + m + 'm ';
+      }
+      return result.substring(0, result.length - 1);
+    }
+</script>
+
+<div class="modal"></div>
+</body>
+</html>
